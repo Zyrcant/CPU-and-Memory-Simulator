@@ -184,7 +184,7 @@ void createInstruction(char* a, char type, int pc)
   std::string s = std::string() + type;
   std::string ins = s + " " + std::to_string(pc);
   strncpy(a, ins.c_str(), 30);
-  a[ins(length()] = 0;
+  a[ins.length()] = 0;
 }
 
 void createWrite(char* a, char type, int pc, int location)

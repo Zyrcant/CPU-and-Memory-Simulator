@@ -56,6 +56,9 @@ int main(int argc, char **argv)
     close(pipes[1]);
     close(pipes2[0]);
 
+    mem[500] = 100;
+    mem[100] = 2;
+
     //process read/write requests from cpu
     while(true)
     {
@@ -72,13 +75,9 @@ int main(int argc, char **argv)
 	elems.push_back(spot);
       }
 
-      for(int i = 0; i < elems.size(); i++)
-	std::cout<<elems[i] + " ";
-      std::cout<<std::endl;
-
       if(elems[0].compare("r") == 0)
       {
-	std::string memoryCells = elems[1];
+	std::string memoryCells = str.substr(2,str.length()-1);
 	write(pipes2[1], &mem[std::stoi(memoryCells)], 2);
       }
       else if(elems[0].compare("w") == 0)
@@ -94,6 +93,7 @@ int main(int argc, char **argv)
       {
 	break;
       }
+      elems.clear();
     }
 
     //close and exit process
@@ -125,13 +125,12 @@ int main(int argc, char **argv)
 
   /*
   createWrite(instruc, 'w', 300, 1999);
-  write(pipes[1], instruc, 31);
+  write(pipes[1], instruc, sizeof(instruc));
   read(pipes2[0], &confirm, sizeof(confirm));*/
 
-  createInstruction(instruc, 'r', pc);
-
   //start CPU by requesting first instruction from memory
-  write(pipes[1], instruc, 31);
+  createInstruction(instruc, 'r', pc);
+  write(pipes[1], instruc, sizeof(instruc));
   read(pipes2[0], &ir, sizeof(ir));
 
   //execute instructions
@@ -142,18 +141,30 @@ int main(int argc, char **argv)
       case 1: //load the value into AC
 	pc++;
 	createInstruction(instruc, 'r', pc);
-	write(pipes[1], instruc, 12);
+	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 2: //load value from the address found into AC
 	pc++; 
 	createInstruction(instruc, 'r', pc);
-	write(pipes[1], instruc, 12); //request address
+	write(pipes[1], instruc, 31); //request address
 	read(pipes2[0], &operand, sizeof(operand)); //get address
 	createInstruction(instruc, 'r', operand); 
-	write(pipes[1], instruc, 12); //request what is at the address
+	write(pipes[1], instruc, 31); //request what is at the address
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
+     /* case 3: //load value from the address found in the given address into the AC
+	pc++; 
+	createInstruction(instruc, 'r', pc);
+	write(pipes[1], instruc, 31); //request first address
+	read(pipes2[0], &operand, sizeof(operand)); //get first address
+	createInstruction(instruc, 'r', operand);
+	write(pipes[1], instruc, 31); //request second address
+	read(pipes2[0], &operand, sizeof(operand)); //get second address;
+	createInstruction(instruc, 'r', operand); //request what is at the second address
+	write(pipes[1], instruc, 31);
+	read(pipes2[0], &ac, sizeof(ac));
+	break;*/
       default: 
 	perror("Not a valid command");
 	break;
@@ -161,14 +172,13 @@ int main(int argc, char **argv)
     pc++;
     std::cout<<"IR is " << ir << " and AC is " << ac << " and PC is " << pc << std::endl;
     createInstruction(instruc, 'r', pc);
-    write(pipes[1], instruc, 12);
+    write(pipes[1], instruc, sizeof(ir));
     read(pipes2[0], &ir, sizeof(ir));
-
   }
   if(ir == 50)
   {
     createInstruction(instruc, 'e', pc);
-    write(pipes[1], instruc, 12);
+    write(pipes[1], instruc, sizeof(instruc));
   }
 
   //close and exit
@@ -184,7 +194,7 @@ void createInstruction(char* a, char type, int pc)
   std::string s = std::string() + type;
   std::string ins = s + " " + std::to_string(pc);
   strncpy(a, ins.c_str(), 30);
-  a[ins(length()] = 0;
+  a[ins.length()] = 0;
 }
 
 void createWrite(char* a, char type, int pc, int location)
