@@ -6,10 +6,12 @@
 #include <cstring>
 #include <string>
 #include <sys/wait.h>
+#include <vector>
+#include <sstream>
 
 //helper functions to create instructions
 void createInstruction(char* a, char type, int pc);
-void createInstruction(char* a, char type, int pc, int location);
+void createWrite(char* a, char type, int pc, int location);
 
 int main(int argc, char **argv)
 {
@@ -47,9 +49,6 @@ int main(int argc, char **argv)
       std::getline(inFile, rest);
     }
 
-    //testing
-    mem[1210] = 12;
-
     //instruction includes whether to read or write: r is for read, w for write
     char instruc[30];
 
@@ -60,25 +59,41 @@ int main(int argc, char **argv)
     //process read/write requests from cpu
     while(true)
     {
-    read(pipes[0], instruc, sizeof(instruc));
-    std::string str = instruc; 
-    std::cout << "The instruction is " << str << std::endl;
+      read(pipes[0], instruc, sizeof(instruc));
+      std::string str = instruc; 
+      std::cout << "The instruction is " << str << std::endl;
 
-    if(instruc[0] == 'r')
-    {
-      std::string memoryCells = str.substr(2,str.length()-1);
-      write(pipes2[1], &mem[std::stoi(memoryCells)], 2);
-    }
-    else if(instruc[0] == 'w')
-    {
-      std::string toWrite = str.substr(2, 6);
-      std::string location = str.substr(7, str.length()-1);
-      std::cout<< "Writing " << toWrite << " to " << location;
-      mem[std::stoi(location)] = std::stoi(toWrite);
-      std::cout<<mem[std::stoi(location)];
-    }
-    if(instruc[0] == 'e')
-      break;
+      //split instruction by space
+      std::stringstream ss(str);
+      std::string spot;
+      std::vector<std::string> elems;
+      while(std::getline(ss, spot, ' '))
+      {
+	elems.push_back(spot);
+      }
+
+      for(int i = 0; i < elems.size(); i++)
+	std::cout<<elems[i] + " ";
+      std::cout<<std::endl;
+
+      if(elems[0].compare("r") == 0)
+      {
+	std::string memoryCells = elems[1];
+	write(pipes2[1], &mem[std::stoi(memoryCells)], 2);
+      }
+      else if(elems[0].compare("w") == 0)
+      {
+	std::string toWrite = elems[1];
+	std::string location = elems[2];
+	std::cout<< "Writing" << toWrite << " to " << location << std::endl;
+	mem[std::stoi(location)] = std::stoi(toWrite);
+	std::cout<<mem[std::stoi(location)];
+	write(pipes2[1], "good", 5);
+      }
+      else if(elems[0].compare("e") == 0)
+      {
+	break;
+      }
     }
 
     //close and exit process
@@ -102,13 +117,21 @@ int main(int argc, char **argv)
   int y = 0;
   int operand;
 
-  char instruc[11];
+
+  char instruc[30];
+
+  //buffer to confirm if writing has happened
+  char confirm[30];
+
+  /*
+  createWrite(instruc, 'w', 300, 1999);
+  write(pipes[1], instruc, 31);
+  read(pipes2[0], &confirm, sizeof(confirm));*/
+
   createInstruction(instruc, 'r', pc);
 
-  //TEST WRITING
-  createInstruction(instruc, 'w', 4, 100);
   //start CPU by requesting first instruction from memory
-  write(pipes[1], instruc, 12);
+  write(pipes[1], instruc, 31);
   read(pipes2[0], &ir, sizeof(ir));
 
   //execute instructions
@@ -157,105 +180,20 @@ int main(int argc, char **argv)
 
 void createInstruction(char* a, char type, int pc)
 {
-  memset(a, 0, sizeof(a));
-  a[0] = type;
-  a[1] = ' ';
-  if(pc < 10)
-    a[2] = pc + '0';
-  else if(pc < 100)
-  {
-    int tens = pc/10;
-    int singles = pc % 10; 
-    a[2] = tens + '0';
-    a[3] = singles + '0';
-  }
-  else if(pc < 1000)
-  {
-    int hundreds = pc/100;
-    int tens = (pc%100)/10;
-    int singles = (pc%100)%10;
-    a[2] = hundreds + '0';
-    a[3] = tens + '0';
-    a[4] = singles + '0';
-  }
-  else //pc > 1000
-  {
-    int thousands = pc/1000;
-    int hundreds = (pc%1000)/100;
-    int tens = ((pc%1000)%100)/10;
-    int singles = ((pc%1000)%100)%10;
-    a[2] = thousands + '0';
-    a[3] = hundreds + '0';
-    a[4] = tens + '0'; 
-    a[5] = singles + '0'; 
-  }
+  memset(a, 0, 30);
+  std::string s = std::string() + type;
+  std::string ins = s + " " + std::to_string(pc);
+  strncpy(a, ins.c_str(), 30);
+  a[ins(length()] = 0;
 }
 
-void createInstruction(char* a, char type, int pc, int location)
+void createWrite(char* a, char type, int pc, int location)
 {
-
-  memset(a, 0, sizeof(a));
-  a[0] = type;
-  a[1] = ' ';
-  if(pc < 10)
-    a[2] = pc + '0';
-  else if(pc < 100)
-  {
-    int tens = pc/10;
-    int singles = pc % 10; 
-    a[2] = tens + '0';
-    a[3] = singles + '0';
-  }
-  else if(pc < 1000)
-  {
-    int hundreds = pc/100;
-    int tens = (pc%100)/10;
-    int singles = (pc%100)%10;
-    a[2] = hundreds + '0';
-    a[3] = tens + '0';
-    a[4] = singles + '0';
-  }
-  else //pc > 1000
-  {
-    int thousands = pc/1000;
-    int hundreds = (pc%1000)/100;
-    int tens = ((pc%1000)%100)/10;
-    int singles = ((pc%1000)%100)%10;
-    a[2] = thousands + '0';
-    a[3] = hundreds + '0';
-    a[4] = tens + '0'; 
-    a[5] = singles + '0'; 
-  }
-
-  a[6] = ' ';
-  if(location < 10)
-    a[7] = location + '0';
-  else if(location < 100)
-  {
-    int tens = location/10;
-    int singles = location % 10; 
-    a[7] = tens + '0';
-    a[8] = singles + '0';
-  }
-  else if(location < 1000)
-  {
-    int hundreds = location/100;
-    int tens = (location%100)/10;
-    int singles = (location%100)%10;
-    a[7] = hundreds + '0';
-    a[8] = tens + '0';
-    a[9] = singles + '0';
-  }
-  else //pc > 1000
-  {
-    int thousands = location/1000;
-    int hundreds = (location%1000)/100;
-    int tens = ((location%1000)%100)/10;
-    int singles = ((location%1000)%100)%10;
-    a[7] = thousands + '0';
-    a[8] = hundreds + '0';
-    a[9] = tens + '0'; 
-    a[10] = singles + '0'; 
-  }
+  memset(a, 0, 30);
+  std::string s = std::string() + type;
+  std::string ins = s + " " + std::to_string(pc) + " " + std::to_string(location);
+  strncpy(a, ins.c_str(), 30);
+  std::cout<<ins.length(); 
+  a[ins.length()] = 0;
 }
 
