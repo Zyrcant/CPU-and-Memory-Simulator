@@ -44,12 +44,27 @@ int main(int argc, char **argv)
     std::ifstream inFile;
     inFile.open(argv[1]); 
     int added;
-    std::string rest;
+    std::string makeNum;
+    std::string line;
     int position = 0;
-    while(inFile >> added) 
+    while(!inFile.eof()) 
     {
-      mem[position++] = added;
-      std::getline(inFile, rest);
+      std::getline(inFile, line);
+      if(line[0] == '.') //new load address
+      {
+	std::string line2 = line.substr(1, line.length()-1);
+	char cstr[line2.size()+1];
+	strcpy(cstr, line2.c_str());
+	position = std::atoi(cstr);
+      }
+      else if(isdigit(line[0]))
+      {
+	char cstr[line.size()+1];
+	strcpy(cstr, line.c_str());
+	added = std::atoi(cstr);
+	mem[position] = added;
+	position++;
+      }
     }
 
     //instruction includes whether to read or write: r is for read, w for write
@@ -110,13 +125,15 @@ int main(int argc, char **argv)
 
   //initialize registers
   int pc = 0;
-  int sp = 999;
+  int sp = 1000;
   int ir = 0;
   int ac = 0;
   int x = 0;
   int y = 0;
   int operand;
 
+  int interruptInterval;
+  int timeTilInterrupt = interruptInterval; 
   //seeds time for random function (Instruction 8)
   srand(time(NULL));
 
@@ -194,7 +211,7 @@ int main(int argc, char **argv)
 	read(pipes2[0], &operand, sizeof(operand));
 	createWrite(instruc, 'w', ac, operand);
 	write(pipes[1], instruc, sizeof(instruc)); 
-	read(pipes2[0], &confirm, sizeof(confirm)); //wait for memory to confirm write
+	read(pipes2[0], confirm, sizeof(confirm)); //wait for memory to confirm write
 	break;
       case 8: //get random int from 1-100 into the AC
 	ac = rand() % 100 + 1;
@@ -204,20 +221,129 @@ int main(int argc, char **argv)
 	createInstruction(instruc, 'r', pc);
 	write(pipes[1], instruc, sizeof(instruc)); 
 	read(pipes2[0], &operand, sizeof(operand));
-	c = ac;
 	if(operand == 1)
 	  std::cout << ac; 
 	else if (operand == 2)
 	  std::cout << static_cast<char>(ac);
+	break;
+      case 10: //addX, adds the value in X to the AC
+	ac += x;
+	break;
+      case 11: //addY, adds the value in Y to the AC
+	ac += y;
+	break;
+      case 12: //subtracts the value in X from the AC
+	ac -= x;
+	break;
+      case 13: //subtracts the value in Y from the AC 
+	ac -= y;
+	break;
+      case 14: //copy the value in the AC to X 
+	x = ac;
+	break;
+      case 15: //copy the value in X to the AC
+	ac = x;
+	break;
+      case 16: //copy the value in the AC to Y
+	y = ac;
+	break;
+      case 17: //copy the value in Y to the AC
+	ac = y;
+	break;
+      case 18: //copy the value in AC to SP
+	sp = ac;
+	break;
+      case 19: //copy the value in SP to the AC
+	ac = sp;
+	break;
+      case 20: //jump to the address
+	pc++;
+	createInstruction(instruc, 'r', pc); 
+	write(pipes[1], instruc, sizeof(instruc)); //request address
+	read(pipes2[0], &operand, sizeof(operand));
+	pc = --operand; //pc will be incremented at loop
+	break;
+      case 21: //jump if ac equal to 0
+	pc++;
+	createInstruction(instruc, 'r', pc); 
+	write(pipes[1], instruc, sizeof(instruc)); //request address
+	read(pipes2[0], &operand, sizeof(operand));
+	if(ac == 0)
+	  pc = --operand; //pc will be incremented at loop
+	break;
+      case 22: //jump if ac is not 0
+	pc++;
+	createInstruction(instruc, 'r', pc); 
+	write(pipes[1], instruc, sizeof(instruc)); //request address
+	read(pipes2[0], &operand, sizeof(operand));
+	if(ac != 0)
+	  pc = --operand; //pc will be incremented at loop
+	break;
+      case 23: //push return address onto stack, jump to the address 
+	pc++; //get address to jump to
+	sp--;
+	createWrite(instruc, 'w', pc, sp); //write current location to stack pointer
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], confirm, sizeof(confirm)); //wait for memory to finish writing
+	createInstruction(instruc, 'r', pc);  //request location to jump to
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], &operand, sizeof(operand));
+	pc = --operand;
+	break;
+      case 24: //pop return address from stack, jump to the address
+	createInstruction(instruc, 'r', sp); //request address at stack pointer
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], &pc, sizeof(pc));
+	sp++;
+	pc;
+	break;
+      case 25: //increment X
+	x++;
+	break;
+      case 26: //decrement X
+	x--;
+	break;
+      case 27: //push AC onto stack
+	sp--;
+	createWrite(instruc, 'w', ac, sp);
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], confirm, sizeof(confirm));
+	break;
+      case 28: //pop from stack into AC
+	createInstruction(instruc, 'r', sp);
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], &ac, sizeof(ac));
+	sp++;
+	break;
+      case 29: //perform system call
+	operand = sp; //save stack pointer
+	sp = 1999;
+	createWrite(instruc, 'w', operand, sp); //write SP to system stack
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], confirm, sizeof(confirm));
+	sp--;
+	createWrite(instruc, 'w', pc, sp); //write PC to system stack
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], confirm, sizeof(confirm));
+	pc = 1500;
+	break;
+      case 30: //return from system call
+	createInstruction(instruc, 'r', sp); 
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], &pc, sizeof(pc));
+	sp++;
+	createInstruction(instruc, 'r', sp);
+	write(pipes[1], instruc, sizeof(instruc));
+	read(pipes2[0], &sp, sizeof(sp));
 	break;
       default: 
 	perror("Not a valid command");
 	break;
     }
     pc++;
-    std::cout<<"IR is " << ir << " and AC is " << ac << " and PC is " << pc << std::endl;
+   // std::cout<<"IR is " << ir << " and AC is " << ac << " and PC is " << pc << std::endl;
     createInstruction(instruc, 'r', pc);
-    write(pipes[1], instruc, sizeof(ir));
+    write(pipes[1], instruc, sizeof(instruc));
     read(pipes2[0], &ir, sizeof(ir));
   }
   if(ir == 50)
