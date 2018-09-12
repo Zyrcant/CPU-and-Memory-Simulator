@@ -13,8 +13,8 @@
 #include <cstdlib>
 
 //helper functions to create instructions
-void createInstruction(char* a, char type, int pc);
-void createWrite(char* a, char type, int pc, int location);
+void createInstruction(char* a, char type, int pc, bool mode);
+void createWrite(char* a, char type, int pc, int location, bool mode);
 
 int main(int argc, char **argv)
 {
@@ -99,13 +99,14 @@ int main(int argc, char **argv)
       {
 	std::string toWrite = elems[1];
 	std::string location = elems[2];
-	std::cout<< "Writing" << toWrite << " to " << location << std::endl;
+	//std::cout<< "Writing" << toWrite << " to " << location << std::endl;
 	mem[std::stoi(location)] = std::stoi(toWrite);
-	std::cout<<mem[std::stoi(location)]<<std::endl;
 	write(pipes2[1], "good", 5);
       }
       else if(elems[0].compare("e") == 0)
       {
+	int i = -1;
+	write(pipes2[1], &i, 2);
 	break;
       }
       elems.clear();
@@ -132,8 +133,10 @@ int main(int argc, char **argv)
   int y = 0;
   int operand;
 
-  int interruptInterval;
-  int timeTilInterrupt = interruptInterval; 
+  bool userMode = true;
+  int interruptInterval = std::stoi(argv[2]);
+  int timeTilInterrupt = interruptInterval;
+
   //seeds time for random function (Instruction 8)
   srand(time(NULL));
 
@@ -144,72 +147,89 @@ int main(int argc, char **argv)
   char confirm[30];
 
   //start CPU by requesting first instruction from memory
-  createInstruction(instruc, 'r', pc);
+  createInstruction(instruc, 'r', pc, userMode);
   write(pipes[1], instruc, sizeof(instruc));
   read(pipes2[0], &ir, sizeof(ir));
 
   //execute instructions
   while(ir != 50)
   {
+    if(timeTilInterrupt == 0 && userMode == true)
+    {
+      operand = sp; //save stack pointer
+      sp = 1999;
+      userMode = false; //change userMode
+      createWrite(instruc, 'w', operand, sp, userMode); //write SP to system stack
+      write(pipes[1], instruc, sizeof(instruc));
+      read(pipes2[0], confirm, sizeof(confirm));
+      sp--;
+      pc--;
+      createWrite(instruc, 'w', pc, sp, userMode); //write PC to system stack
+      write(pipes[1], instruc, sizeof(instruc));
+      read(pipes2[0], confirm, sizeof(confirm));
+      pc = 999;
+      timeTilInterrupt = interruptInterval;
+    }
+    else{
     switch(ir)
     {
       case 1: //load the value into AC
 	pc++;
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 2: //load value from the address found into AC
 	pc++; 
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand)); //get address
-	createInstruction(instruc, 'r', operand); 
+	createInstruction(instruc, 'r', operand, userMode); 
 	write(pipes[1], instruc, sizeof(instruc)); //request what is at the address
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 3: //load value from the address found in the given address into the AC
 	pc++; 
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); //request first address
 	read(pipes2[0], &operand, sizeof(operand)); //get first address
-	createInstruction(instruc, 'r', operand);
+	createInstruction(instruc, 'r', operand, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); //request second address
 	read(pipes2[0], &operand, sizeof(operand)); //get second address;
-	createInstruction(instruc, 'r', operand); //request what is at the second address
+	createInstruction(instruc, 'r', operand, userMode); //request what is at the second address
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 4: //load value at address+X into the AC
 	pc++;
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand)); //get address
-	createInstruction(instruc, 'r', operand+x); //request what is at address+x
+	createInstruction(instruc, 'r', operand+x, userMode); //request what is at address+x
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 5: //load value at address+Y into the AC
 	pc++;
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand)); //get address
-	createInstruction(instruc, 'r', operand+y); //request what is at address+x
+	createInstruction(instruc, 'r', operand+y, userMode); //request what is at address+x
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 6: //load from sp+x into the AC
 	operand = sp + x;
-	createInstruction(instruc, 'r', operand);
+	createInstruction(instruc, 'r', operand, userMode);
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	break;
       case 7: //store value in the AC into the address
 	pc++;
-	createInstruction(instruc, 'r', pc); 
+	createInstruction(instruc, 'r', pc, userMode); 
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand));
-	createWrite(instruc, 'w', ac, operand);
+	createWrite(instruc, 'w', ac, operand, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); 
 	read(pipes2[0], confirm, sizeof(confirm)); //wait for memory to confirm write
 	break;
@@ -218,7 +238,7 @@ int main(int argc, char **argv)
 	break;
       case 9: //put port, if port = 1, writes AC as int to screen, if port = 2, writes AC as char
 	pc++;
-	createInstruction(instruc, 'r', pc);
+	createInstruction(instruc, 'r', pc, userMode);
 	write(pipes[1], instruc, sizeof(instruc)); 
 	read(pipes2[0], &operand, sizeof(operand));
 	if(operand == 1)
@@ -258,14 +278,14 @@ int main(int argc, char **argv)
 	break;
       case 20: //jump to the address
 	pc++;
-	createInstruction(instruc, 'r', pc); 
+	createInstruction(instruc, 'r', pc, userMode); 
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand));
 	pc = --operand; //pc will be incremented at loop
 	break;
       case 21: //jump if ac equal to 0
 	pc++;
-	createInstruction(instruc, 'r', pc); 
+	createInstruction(instruc, 'r', pc, userMode); 
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand));
 	if(ac == 0)
@@ -273,7 +293,7 @@ int main(int argc, char **argv)
 	break;
       case 22: //jump if ac is not 0
 	pc++;
-	createInstruction(instruc, 'r', pc); 
+	createInstruction(instruc, 'r', pc, userMode); 
 	write(pipes[1], instruc, sizeof(instruc)); //request address
 	read(pipes2[0], &operand, sizeof(operand));
 	if(ac != 0)
@@ -282,16 +302,16 @@ int main(int argc, char **argv)
       case 23: //push return address onto stack, jump to the address 
 	pc++; //get address to jump to
 	sp--;
-	createWrite(instruc, 'w', pc, sp); //write current location to stack pointer
+	createWrite(instruc, 'w', pc, sp, userMode); //write current location to stack pointer
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], confirm, sizeof(confirm)); //wait for memory to finish writing
-	createInstruction(instruc, 'r', pc);  //request location to jump to
+	createInstruction(instruc, 'r', pc, userMode);  //request location to jump to
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &operand, sizeof(operand));
 	pc = --operand;
 	break;
       case 24: //pop return address from stack, jump to the address
-	createInstruction(instruc, 'r', sp); //request address at stack pointer
+	createInstruction(instruc, 'r', sp, userMode); //request address at stack pointer
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &pc, sizeof(pc));
 	sp++;
@@ -305,12 +325,12 @@ int main(int argc, char **argv)
 	break;
       case 27: //push AC onto stack
 	sp--;
-	createWrite(instruc, 'w', ac, sp);
+	createWrite(instruc, 'w', ac, sp, userMode);
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], confirm, sizeof(confirm));
 	break;
       case 28: //pop from stack into AC
-	createInstruction(instruc, 'r', sp);
+	createInstruction(instruc, 'r', sp, userMode);
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &ac, sizeof(ac));
 	sp++;
@@ -318,37 +338,42 @@ int main(int argc, char **argv)
       case 29: //perform system call
 	operand = sp; //save stack pointer
 	sp = 1999;
-	createWrite(instruc, 'w', operand, sp); //write SP to system stack
+	userMode = false; //change userMode
+	createWrite(instruc, 'w', operand, sp, userMode); //write SP to system stack
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], confirm, sizeof(confirm));
 	sp--;
-	createWrite(instruc, 'w', pc, sp); //write PC to system stack
+	createWrite(instruc, 'w', pc, sp, userMode); //write PC to system stack
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], confirm, sizeof(confirm));
-	pc = 1500;
+	pc = 1499;
 	break;
       case 30: //return from system call
-	createInstruction(instruc, 'r', sp); 
+	createInstruction(instruc, 'r', sp, userMode); 
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &pc, sizeof(pc));
 	sp++;
-	createInstruction(instruc, 'r', sp);
+	createInstruction(instruc, 'r', sp, userMode);
 	write(pipes[1], instruc, sizeof(instruc));
 	read(pipes2[0], &sp, sizeof(sp));
+	userMode = true;
 	break;
-      default: 
-	perror("Not a valid command");
+      default:
+	std::cout<<"NOT A VALID COMMMAND" << ir << std::endl;
 	break;
     }
+    }
     pc++;
-   // std::cout<<"IR is " << ir << " and AC is " << ac << " and PC is " << pc << std::endl;
-    createInstruction(instruc, 'r', pc);
+    if(userMode == true)
+    	timeTilInterrupt--;
+    std::cout<<"IR is " << ir << " and AC is " << ac << " and PC is " << pc << std::endl;
+    createInstruction(instruc, 'r', pc, userMode);
     write(pipes[1], instruc, sizeof(instruc));
     read(pipes2[0], &ir, sizeof(ir));
   }
   if(ir == 50)
   {
-    createInstruction(instruc, 'e', pc);
+    createInstruction(instruc, 'e', pc, userMode);
     write(pipes[1], instruc, sizeof(instruc));
   }
 
@@ -359,21 +384,45 @@ int main(int argc, char **argv)
   return(0);
 }
 
-void createInstruction(char* a, char type, int pc)
+void createInstruction(char* a, char type, int pc, bool mode)
 {
   memset(a, 0, 30);
-  std::string s = std::string() + type;
-  std::string ins = s + " " + std::to_string(pc);
-  strncpy(a, ins.c_str(), 30);
-  a[ins.length()] = 0;
+  if(mode == true && pc > 999)
+  {
+    perror("Cannot access system memory in user mode!");
+    //create exit instruction
+    std::string s = std::string() + 'e';
+    std::string ins = s + " " + std::to_string(-1);
+    strncpy(a, ins.c_str(), 30);
+    a[ins.length()] = 0;
+  }
+  else
+  {
+    std::string s = std::string() + type;
+    std::string ins = s + " " + std::to_string(pc);
+    strncpy(a, ins.c_str(), 30);
+    a[ins.length()] = 0;
+  }
 }
 
-void createWrite(char* a, char type, int pc, int location)
+void createWrite(char* a, char type, int pc, int location, bool mode)
 {
   memset(a, 0, 30);
-  std::string s = std::string() + type;
-  std::string ins = s + " " + std::to_string(pc) + " " + std::to_string(location);
-  strncpy(a, ins.c_str(), 30);
-  a[ins.length()] = 0;
+  if(mode == true && location > 999)
+  {
+    perror("Cannot access system memory in user mode!");
+    //create exit instruction
+    std::string s = std::string() + 'e';
+    std::string ins = s + " " + std::to_string(-1);
+    strncpy(a, ins.c_str(), 30);
+    a[ins.length()] = 0;
+  }
+  else
+  {
+    std::string s = std::string() + type;
+    std::string ins = s + " " + std::to_string(pc) + " " + std::to_string(location);
+    strncpy(a, ins.c_str(), 30);
+    a[ins.length()] = 0;
+  }
 }
 
