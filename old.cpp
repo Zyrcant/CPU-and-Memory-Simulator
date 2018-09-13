@@ -154,6 +154,23 @@ int main(int argc, char **argv)
   //execute instructions
   while(ir != 50)
   {
+    if(timeTilInterrupt == 0 && userMode == true)
+    {
+      operand = sp; //save stack pointer
+      sp = 1999;
+      userMode = false; //change userMode
+      createWrite(instruc, 'w', operand, sp, userMode); //write SP to system stack
+      write(pipes[1], instruc, sizeof(instruc));
+      read(pipes2[0], confirm, sizeof(confirm));
+      sp--;
+      pc--;
+      createWrite(instruc, 'w', pc, sp, userMode); //write PC to system stack
+      write(pipes[1], instruc, sizeof(instruc));
+      read(pipes2[0], confirm, sizeof(confirm));
+      pc = 999;
+      timeTilInterrupt = interruptInterval;
+    }
+    else{
     switch(ir)
     {
       case 1: //load the value into AC
@@ -346,20 +363,6 @@ int main(int argc, char **argv)
 	std::cout<<"NOT A VALID COMMMAND" << ir << std::endl;
 	break;
     }
-    if(timeTilInterrupt == 0 && userMode == true)
-    {
-      operand = sp; //save stack pointer
-      sp = 1999;
-      userMode = false; //change userMode
-      createWrite(instruc, 'w', operand, sp, userMode); //write SP to system stack
-      write(pipes[1], instruc, sizeof(instruc));
-      read(pipes2[0], confirm, sizeof(confirm));
-      sp--;
-      createWrite(instruc, 'w', pc, sp, userMode); //write PC to system stack
-      write(pipes[1], instruc, sizeof(instruc));
-      read(pipes2[0], confirm, sizeof(confirm));
-      pc = 999;
-      timeTilInterrupt = interruptInterval;
     }
     pc++;
     if(userMode == true)

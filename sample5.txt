@@ -1,0 +1,65 @@
+1 //Load H
+72
+9
+2
+1 //load E
+69
+9
+2
+1 //load L
+76
+9 //write L twice
+2
+9
+2
+1 //load O
+79
+9
+2
+23 // jump to 
+57
+1 //Load W
+87
+9
+2
+1 //Load N to AC
+78
+14 //copy to X
+25 //increment X to O
+15 //copy back to AC
+9
+2
+1 //load Q to AC
+81
+14 //copy to X
+25 //increment X to R
+15 //copy back to AC
+9 
+2
+1 //load K to AC
+75
+14 //copy to X
+25 //increment X to L
+15 //copy back to AC
+9 
+2
+1 //load C to AC
+67
+14 //copy to X
+25 //increment X to R
+15 //copy back to AC
+9 
+2
+1 //load new line
+10
+9
+2
+50
+1 // load space
+32
+9 //write space
+2
+24 //return
+
+.1000
+30
