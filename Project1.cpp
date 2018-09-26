@@ -18,7 +18,11 @@ void createWrite(char* a, char type, int pc, int location, bool mode);
 
 int main(int argc, char **argv)
 {
-
+  if(argc < 3)
+  {
+    std::cout<<"Please provide command line arguments"<<std::endl;
+    return(1);
+  }
   //pipes to communicate between memory and parent
   //pipes is written to by CPU and read by memory. pipes2 is written to by memory and read by CPU
   int pipes[2];
@@ -32,7 +36,7 @@ int main(int argc, char **argv)
   if(childpid == -1)
   {
     perror("Eror creating a child process");
-    exit(-1);
+    return(1);
   }
   //memory process
   if(childpid == 0)
@@ -42,7 +46,15 @@ int main(int argc, char **argv)
  
     //initialize memory 
     std::ifstream inFile;
-    inFile.open(argv[1]); 
+    try
+    {
+    	inFile.open(argv[1]);
+    }
+    catch (int e)
+    {
+      std::cout<<"Please provide a correct file to run.";
+      return(1);
+    }
     int added;
     std::string makeNum;
     std::string line;
@@ -134,7 +146,21 @@ int main(int argc, char **argv)
   int operand;
 
   bool userMode = true;
-  int interruptInterval = std::stoi(argv[2]);
+  int interruptInterval;
+  try
+  {
+    interruptInterval = std::stoi(argv[2]);
+  }
+  catch (int e)
+  {
+    std::cout<<"Please provide a proper interrupt interval."<<std::endl;
+    return(1);
+  }
+  if(interruptInterval <= 0)
+  {
+    std::cout<<"Please provide a valid interrupt interval."<<std::endl; 
+    return(1);
+  }
   int timeTilInterrupt = interruptInterval;
 
   //seeds time for random function (Instruction 8)
